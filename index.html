@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azlan Power Equipment Billing</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{margin:0;background:#f3f5f7;padding:15px}
+.header{background:#111;color:#fff;border-radius:18px;padding:20px;text-align:center}
+.logo{max-width:140px;width:100%;display:block;margin:0 auto 10px}
+.brand{color:#39ff5a;font-weight:bold}
+.card{background:#fff;margin-top:15px;padding:15px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+label{display:block;margin-top:10px;font-weight:bold}
+input{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;margin-top:5px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;padding:12px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;margin-top:10px}
+.save{background:#39ff5a}
+.print{background:#111;color:#fff}
+.bill{border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:10px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#eef7ef;padding:12px;border-radius:10px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="header">
+<img src="logo.png" class="logo" onerror="this.style.display='none'">
+<h1>AZLAN</h1>
+<div class="brand">POWER EQUIPMENT</div>
+</div>
+
+<div class="card">
+<h3>New Bill</h3>
+<p>Invoice: <b id="invNo"></b></p>
+
+<label>Date</label>
+<input type="date" id="date">
+
+<label>Return Date</label>
+<input type="date" id="returnDate">
+
+<label>Customer Name</label>
+<input type="text" id="name">
+
+<label>Customer Number</label>
+<input type="text" id="phone">
+
+<label>Customer Place</label>
+<input type="text" id="place">
+
+<label>Equipment Name</label>
+<input type="text" id="equipment">
+
+<div class="grid">
+<div>
+<label>Amount</label>
+<input type="number" id="amount" oninput="calc()">
+</div>
+<div>
+<label>Paid</label>
+<input type="number" id="paid" oninput="calc()">
+</div>
+</div>
+
+<label>Balance</label>
+<input type="number" id="balance" readonly>
+
+<button class="btn print" onclick="downloadPDF()">Save PDF</button>
+</div>
+
+<div class="card">
+<div class="stats">
+<div class="stat"><h3 id="totalBills">0</h3>Total Bills</div>
+<div class="stat"><h3 id="pending">0</h3>Pending</div>
+</div>
+</div>
+
+<div class="card">
+<input type="text" id="search" placeholder="Search customer..." onkeyup="showBills()">
+<div id="list"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+function nextInvoice(){
+ let n=Number(localStorage.getItem('invoiceCounter')||1);
+ document.getElementById('invNo').innerText='INV'+String(n).padStart(3,'0');
+}
+nextInvoice();
+
+function calc(){
+ let a=Number(amount.value||0);
+ let p=Number(paid.value||0);
+ balance.value=a-p;
+}
+
+function saveBill(){
+ let bills=JSON.parse(localStorage.getItem('azlanBills')||'[]');
+ let counter=Number(localStorage.getItem('invoiceCounter')||1);
+
+ let bill={
+ id:Date.now(),
+ invoice:'INV'+String(counter).padStart(3,'0'),
+ date:date.value,
+ returnDate:returnDate.value,
+ name:name.value,
+ phone:phone.value,
+ place:place.value,
+ equipment:equipment.value,
+ amount:amount.value,
+ paid:paid.value,
+ balance:balance.value
+ };
+
+ bills.push(bill);
+ localStorage.setItem('azlanBills',JSON.stringify(bills));
+ localStorage.setItem('invoiceCounter',counter+1);
+
+ alert('Bill Saved');
+ nextInvoice();
+ showBills();
+}
+
+async function downloadPDF(){
+ const { jsPDF } = window.jspdf;
+ const pdf = new jsPDF();
+
+ pdf.setFontSize(18);
+ pdf.text("AZLAN POWER EQUIPMENT",20,20);
+
+ pdf.setFontSize(12);
+ pdf.text("Invoice: " + invNo.innerText,20,35);
+ pdf.text("Date: " + date.value,20,45);
+ pdf.text("Return Date: " + returnDate.value,20,55);
+ pdf.text("Customer: " + name.value,20,70);
+ pdf.text("Phone: " + phone.value,20,80);
+ pdf.text("Place: " + place.value,20,90);
+ pdf.text("Equipment: " + equipment.value,20,100);
+ pdf.text("Amount: Rs. " + amount.value,20,115);
+ pdf.text("Paid: Rs. " + paid.value,20,125);
+ pdf.text("Balance: Rs. " + balance.value,20,135);
+
+ pdf.save((name.value || "Invoice") + ".pdf");
+}
+
+function delBill(id){
+ let bills=JSON.parse(localStorage.getItem('azlanBills')||'[]');
+ bills=bills.filter(x=>x.id!==id);
+ localStorage.setItem('azlanBills',JSON.stringify(bills));
+ showBills();
+}
+
+function showBills(){
+ let bills=JSON.parse(localStorage.getItem('azlanBills')||'[]');
+ let s=(search.value||'').toLowerCase();
+ let html='';
+ let pendingAmt=0;
+
+ bills.forEach(b=>{
+  pendingAmt+=Number(b.balance||0);
+  if(b.name.toLowerCase().includes(s) || b.phone.includes(s)){
+   html+=`<div class="bill">
+   <b>${b.invoice}</b><br>
+   ${b.name}<br>
+   ${b.phone}<br>
+   Equipment: ${b.equipment}<br>
+   Amount: ₹${b.amount} | Paid: ₹${b.paid}<br>
+   Balance: ₹${b.balance}<br><br>
+   <button onclick="delBill(${b.id})">Delete</button>
+   </div>`;
+  }
+ });
+
+ list.innerHTML=html;
+ totalBills.innerText=bills.length;
+ pending.innerText='₹'+pendingAmt;
+}
+showBills();
+</script>
+</body>
+</html>
